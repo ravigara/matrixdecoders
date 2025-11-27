@@ -22,6 +22,7 @@ class EnergySimulator:
             "EV Charger": {"status": "OFF", "power": 0.0}
         }
         
+        # Simulate dynamic load
         if random.random() > 0.7: 
             appliances["AC"]["status"] = "ON"
             appliances["AC"]["power"] = 1.5
@@ -30,11 +31,15 @@ class EnergySimulator:
         if self.abnormal_mode:
             current_load += 4.0 
             
+        # Calculation: 1 kW load for 1 hour = 1 Unit. 
+        # Assuming avg Indian cost ₹10 per Unit.
+        cost_per_hour = current_load * 10.0
+
         return {
             "timestamp": datetime.now().strftime("%H:%M:%S"),
             "total_load_kw": round(current_load, 2),
-            "voltage": round(random.uniform(218, 225), 1),
-            "cost_per_hour": round(current_load * 0.12, 2),
+            "voltage": round(random.uniform(220, 240), 1), # Indian Standard Voltage
+            "cost_per_hour": round(cost_per_hour, 2),
             "appliances": appliances,
             "anomaly": self.abnormal_mode
         }
@@ -59,14 +64,15 @@ class EnergySimulator:
                 
                 if date_str not in seen_dates:
                     temp = item['main']['temp']
-                    predicted_kwh = 10.0 
-                    if temp > 25: predicted_kwh += (temp - 25) * 0.8 
-                    elif temp < 18: predicted_kwh += (18 - temp) * 0.6
+                    # Smart Prediction Logic
+                    predicted_units = 8.0 # Base units
+                    if temp > 28: predicted_units += (temp - 28) * 1.5 # AC Load
+                    elif temp < 15: predicted_units += (15 - temp) * 1.0 # Heater
                         
                     forecast_data.append({
                         "date": date_str,
                         "temp_c": round(temp, 1),
-                        "predicted_kwh": round(predicted_kwh, 2)
+                        "predicted_kwh": round(predicted_units, 2)
                     })
                     seen_dates.add(date_str)
                     if len(forecast_data) >= 5: break
@@ -77,7 +83,7 @@ class EnergySimulator:
 
     def _get_dummy_forecast(self):
         dates = [datetime.now() + timedelta(days=i) for i in range(5)]
-        return [{"date": d.strftime("%Y-%m-%d"), "temp_c": 28, "predicted_kwh": 12} for d in dates]
+        return [{"date": d.strftime("%Y-%m-%d"), "temp_c": 30, "predicted_kwh": 15} for d in dates]
 
     def trigger_anomaly(self, status: bool):
         self.abnormal_mode = status

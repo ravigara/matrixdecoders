@@ -14,29 +14,67 @@ from streamlit_mic_recorder import mic_recorder
 
 # --- CONFIGURATION ---
 API_URL = "http://127.0.0.1:8000"
-st.set_page_config(page_title="EcoSense AI", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="WattQ - Smart Energy", page_icon="⚡", layout="wide")
 
-# --- CUSTOM CSS ---
+# --- CUSTOM CSS (POLISHED UI) ---
 st.markdown("""
 <style>
-    .main { background-color: #0E1117; }
+    /* Main Background */
+    .main { background-color: #050505; }
+    
+    /* Metric Cards */
     div.stMetric {
-        background-color: #1E1E1E;
-        border: 1px solid #333;
-        padding: 15px;
-        border-radius: 10px;
+        background: linear-gradient(135deg, #1e1e1e, #2a2a2a);
+        border: 1px solid #444;
+        padding: 20px;
+        border-radius: 15px;
         color: white;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        transition: transform 0.2s;
     }
-    div.stMetric:hover { border-color: #00FF7F; }
-    h1, h2, h3 { color: #00FF7F; font-family: 'Segoe UI', sans-serif; }
+    div.stMetric:hover {
+        transform: translateY(-5px);
+        border-color: #00FF7F;
+    }
+    
+    /* Headers */
+    h1 { 
+        background: -webkit-linear-gradient(left, #00FF7F, #00C3FF);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-family: 'Segoe UI', sans-serif;
+        font-weight: 800;
+    }
+    h2, h3 { color: #E0E0E0; }
+    
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background-color: #111;
+        border-right: 1px solid #333;
+    }
+    
+    /* Quote Styling */
+    .quote-text {
+        font-style: italic;
+        color: #888;
+        font-size: 1.1rem;
+        margin-bottom: 20px;
+    }
+    
+    /* Tip Card */
+    .tip-card {
+        background-color: #1a1a1a;
+        border-left: 5px solid #00C3FF;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# --- TEXT TO SPEECH SETUP ---
+# --- TEXT TO SPEECH ---
 engine_lock = threading.Lock()
-
 def speak_text(text):
-    """Function to make the computer speak the response"""
     def run_speech():
         with engine_lock:
             try:
@@ -44,102 +82,153 @@ def speak_text(text):
                 engine.setProperty('rate', 150)
                 engine.say(text)
                 engine.runAndWait()
-            except:
-                pass 
+            except: pass 
     t = threading.Thread(target=run_speech)
     t.start()
 
+# --- HELPER: COLOR LOGIC ---
+def get_status_color(load):
+    if load < 1.0: return "#00FF7F"  # Low: Green
+    elif load < 3.0: return "#FFD700" # Optimal: Yellow/Gold
+    else: return "#FF4B4B"           # High: Red
+
 # --- SIDEBAR ---
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3103/3103446.png", width=100)
-    st.title("EcoSense AI")
+    st.image("https://cdn-icons-png.flaticon.com/512/2933/2933886.png", width=80)
+    st.title("WattQ")
+    st.markdown("*Intelligent Energy Monitor*")
     
     selected = option_menu(
         menu_title=None,
-        options=["Dashboard", "Appliance DNA", "Community Rank", "AI Forecast", "Voice Assist", "Admin Control"],
-        icons=["speedometer2", "cpu", "trophy", "graph-up", "mic", "gear"],
+        options=["Dashboard", "Smart Tips", "Appliance DNA", "Community Rank", "AI Forecast", "Voice Assist", "Admin Control"],
+        icons=["speedometer", "lightbulb", "cpu", "trophy", "graph-up-arrow", "mic", "gear"],
         menu_icon="cast",
         default_index=0,
         styles={
-            "container": {"padding": "0!important", "background-color": "#1E1E1E"},
-            "icon": {"color": "white", "font-size": "20px"},
-            "nav-link": {"font-size": "16px", "text-align": "left", "margin": "0px", "--hover-color": "#333"},
+            "container": {"padding": "0!important", "background-color": "transparent"},
+            "icon": {"color": "white", "font-size": "18px"},
+            "nav-link": {"font-size": "15px", "text-align": "left", "margin": "0px", "--hover-color": "#333"},
             "nav-link-selected": {"background-color": "#00994C"},
         }
     )
     st.divider()
-    st.info("System Status: Online 🟢")
+    st.info("Status: Connected 🟢")
 
-# --- HELPER: FETCH DATA ---
+# --- FETCH DATA ---
 def fetch_live_data():
-    try:
-        response = requests.get(f"{API_URL}/api/live")
-        return response.json()
-    except:
-        return None
+    try: return requests.get(f"{API_URL}/api/live").json()
+    except: return None
 
 # --- PAGE 1: DASHBOARD ---
 if selected == "Dashboard":
-    st.title("🏠 Live Energy Monitor")
+    st.title("⚡ WattQ Dashboard")
+    st.markdown('<p class="quote-text">"Energy saved is energy generated."</p>', unsafe_allow_html=True)
     
     data = fetch_live_data()
     
     if data:
         if data['anomaly']:
-            st.error("🚨 CRITICAL ALERT: ABNORMAL POWER SPIKE DETECTED! POTENTIAL FIRE HAZARD.", icon="🔥")
+            st.error("🚨 CRITICAL WARNING: ABNORMAL SURGE DETECTED! FIRE RISK.", icon="🔥")
         
-        kpi1, kpi2, kpi3, kpi4 = st.columns(4)
-        kpi1.metric("Current Load", f"{data['total_load_kw']} kW", "Live")
-        kpi2.metric("Voltage", f"{data['voltage']} V", "Stable")
-        kpi3.metric("Est. Cost/Hr", f"${data['cost_per_hour']}", "USD")
-        kpi4.metric("Grid Health", "98%", "Excellent")
+        load = data['total_load_kw']
+        color_hex = get_status_color(load)
+        
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Current Load", f"{load} kW", "Live")
+        k2.metric("Voltage", f"{data['voltage']} V", "Stable")
+        k3.metric("Cost Rate", f"₹{data['cost_per_hour']}/hr", "Est.")
+        k4.metric("Grid Health", "99%", "Optimal")
 
         col1, col2 = st.columns([2, 1])
         with col1:
-            st.subheader("⚡ Real-Time Consumption Trend")
+            st.subheader("Real-Time Consumption")
             chart_data = pd.DataFrame({
                 'Time': pd.date_range(start='now', periods=20, freq='s'),
-                'Power (kW)': [data['total_load_kw'] + (x*0.05) for x in range(20)]
+                'Load (kW)': [load + (x*0.02) for x in range(20)]
             })
-            fig_area = px.area(chart_data, x='Time', y='Power (kW)', color_discrete_sequence=['#00FF7F'])
-            fig_area.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="white")
+            fig_area = px.area(chart_data, x='Time', y='Load (kW)')
+            fig_area.update_traces(line_color=color_hex, fillcolor=color_hex)
+            fig_area.update_layout(
+                plot_bgcolor="rgba(0,0,0,0)", 
+                paper_bgcolor="rgba(0,0,0,0)", 
+                font_color="#ccc",
+                yaxis=dict(range=[0, max(5, load+1)])
+            )
             st.plotly_chart(fig_area, use_container_width=True)
             
         with col2:
-            st.subheader("🔌 Active Devices")
+            st.subheader("Active Units")
             apps = data['appliances']
             active_count = sum(1 for x in apps.values() if x['status'] == "ON")
             fig_gauge = go.Figure(go.Indicator(
                 mode = "gauge+number",
                 value = active_count,
                 title = {'text': "Devices ON"},
-                gauge = {'axis': {'range': [None, 10]}, 'bar': {'color': "#00FF7F"}}
+                gauge = {
+                    'axis': {'range': [None, 10]}, 
+                    'bar': {'color': color_hex}, 
+                    'bgcolor': "#222"
+                }
             ))
-            fig_gauge.update_layout(height=250, margin=dict(l=20,r=20,t=50,b=20), paper_bgcolor="rgba(0,0,0,0)", font_color="white")
+            fig_gauge.update_layout(height=250, margin=dict(t=30,b=10), paper_bgcolor="rgba(0,0,0,0)", font_color="white")
             st.plotly_chart(fig_gauge, use_container_width=True)
 
-# --- PAGE 2: APPLIANCE DNA (Restored "Old Good Style") ---
-elif selected == "Appliance DNA":
-    st.title("🔍 Non-Intrusive Load Monitoring (NILM)")
-    st.markdown("### 🛠️ Device Configuration & Analysis")
+# --- PAGE 2: SMART TIPS (NEW FEATURE) ---
+elif selected == "Smart Tips":
+    st.title("💡 Personalized Recommendations")
+    st.markdown("AI-driven insights based on your **Live Usage** and **Local Weather**.")
     
-    # Categorized Device List
+    col_in, col_btn = st.columns([2, 1])
+    with col_in:
+        city = st.text_input("Confirm Location for Weather Analysis", value="Hubballi")
+    with col_btn:
+        st.write("") # Spacer
+        st.write("") # Spacer
+        gen_btn = st.button("✨ Generate AI Tips", use_container_width=True)
+    
+    if gen_btn:
+        with st.spinner("Analyzing your home's DNA..."):
+            try:
+                # Call Backend API
+                res = requests.get(f"{API_URL}/api/recommendations?city={city}").json()
+                tips_text = res.get('tips', "No recommendations available.")
+                
+                st.success("Analysis Complete!")
+                st.divider()
+                
+                # Display Tips
+                st.markdown(tips_text)
+                
+            except Exception as e:
+                st.error("AI Service is currently busy. Please try again.")
+
+    # Static Fallback / Examples if no generation yet
+    if not gen_btn:
+        st.info("Click the button above to analyze your real-time data.")
+        st.markdown("### Why this matters:")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Avg Savings", "₹450", "Monthly")
+        c2.metric("Carbon Footprint", "-12%", "Reduced")
+        c3.metric("Grid Efficiency", "98%", "Optimized")
+
+# --- PAGE 3: APPLIANCE DNA ---
+elif selected == "Appliance DNA":
+    st.title("🔍 Appliance DNA")
+    st.markdown("### Identify & Optimize")
+    
     device_catalog = {
-        "Kitchen 🍳": ["Refrigerator", "Microwave", "Dishwasher", "Induction Cooktop", "Toaster"],
-        "Living Room 🛋️": ["Air Conditioner", "Television", "Smart Speaker", "Ceiling Fan"],
-        "Laundry & Utility 🧺": ["Washing Machine", "Dryer", "Water Heater", "Vacuum Cleaner"],
-        "Garage & Outdoor 🚗": ["EV Charger", "Pool Pump", "Lawn Mower"]
+        "Kitchen 🍳": ["Refrigerator", "Microwave", "Dishwasher", "Induction"],
+        "Living Room 🛋️": ["Air Conditioner", "TV", "Smart Speaker", "Fan"],
+        "Utility 🧺": ["Washing Machine", "Geyser", "Inverter", "Pump"],
+        "Outdoor 🚗": ["EV Charger", "Garden Lights"]
     }
 
     if "my_appliances" not in st.session_state:
-        st.session_state.my_appliances = ["Refrigerator", "Air Conditioner", "Television", "Washing Machine"]
+        st.session_state.my_appliances = ["Refrigerator", "Air Conditioner", "TV", "Fan"]
 
-    # The Expander Style you liked
-    with st.expander("📝 Manage Device List (Click to Edit)", expanded=False):
-        st.info("Select the appliances currently connected to your smart meter.")
+    with st.expander("📝 Device Manager (Click to Edit)", expanded=False):
         cols = st.columns(4)
         selected_temp = []
-        
         for i, (category, devices) in enumerate(device_catalog.items()):
             with cols[i]:
                 st.markdown(f"**{category}**")
@@ -147,258 +236,187 @@ elif selected == "Appliance DNA":
                     is_checked = dev in st.session_state.my_appliances
                     if st.checkbox(dev, value=is_checked, key=f"chk_{dev}"):
                         selected_temp.append(dev)
-        
-        if st.button("💾 Update Monitored Devices"):
+        if st.button("Update Profile"):
             st.session_state.my_appliances = selected_temp
-            st.success("Device list updated successfully!")
-            time.sleep(1)
             st.rerun()
 
     st.divider()
-    st.subheader(f"📊 Live Analysis: {len(st.session_state.my_appliances)} Devices Monitored")
-
-    if not st.session_state.my_appliances:
-        st.warning("⚠️ No devices selected. Please configure your device list above.")
-    else:
-        total_dummy_load = 0
+    
+    if st.session_state.my_appliances:
         device_data = []
+        total_load = 0
         for dev in st.session_state.my_appliances:
             status = "ON" if random.random() > 0.4 else "OFF"
-            base_power = 0.05
-            if dev in ["EV Charger", "Water Heater", "Air Conditioner"]: base_power = random.uniform(1.5, 3.5)
-            elif dev in ["Refrigerator", "Washing Machine", "Dishwasher"]: base_power = random.uniform(0.3, 1.2)
+            power = 0.05
+            if dev in ["EV Charger", "Geyser", "Air Conditioner"]: power = random.uniform(1.5, 3.0)
+            elif dev in ["Refrigerator", "Washing Machine"]: power = random.uniform(0.3, 1.0)
             
-            actual_power = base_power if status == "ON" else 0.005
-            total_dummy_load += actual_power
-            device_data.append({"Device": dev, "Status": status, "Power (kW)": round(actual_power, 3), "Usage %": 0})
+            actual = power if status == "ON" else 0.01
+            total_load += actual
+            device_data.append({"Device": dev, "Status": status, "Power": actual})
         
-        for d in device_data:
-            d["Usage %"] = round((d["Power (kW)"] / total_dummy_load) * 100, 1) if total_dummy_load > 0 else 0
-
-        col1, col2 = st.columns([1, 1.5])
-        with col1:
-            st.markdown("#### ⚡ Real-Time Load Breakdown")
+        c1, c2 = st.columns([1, 1.5])
+        with c1:
             df_chart = pd.DataFrame(device_data)
-            df_active = df_chart[df_chart["Power (kW)"] > 0.01]
-            if not df_active.empty:
-                fig = px.pie(df_active, values='Power (kW)', names='Device', hole=0.5, color_discrete_sequence=px.colors.sequential.Tealgrn)
-                fig.update_traces(textposition='inside', textinfo='percent+label')
-                fig.update_layout(showlegend=False, margin=dict(t=0, b=0, l=0, r=0), paper_bgcolor="rgba(0,0,0,0)", font_color="white")
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("All devices are currently in Standby/OFF mode.")
-
-        with col2:
-            st.markdown("#### 🔍 Device Health & Patterns")
+            fig = px.pie(df_chart, values='Power', names='Device', hole=0.6, color_discrete_sequence=px.colors.sequential.Tealgrn)
+            fig.update_layout(showlegend=False, paper_bgcolor="rgba(0,0,0,0)", font_color="white", title="Load Distribution")
+            st.plotly_chart(fig, use_container_width=True)
+            
+        with c2:
+            st.markdown("#### Live Insights")
             for item in device_data:
-                color = "green" if item["Status"] == "ON" else "grey"
-                alert = None
-                if item["Device"] == "Air Conditioner" and item["Status"] == "ON" and random.random() > 0.8: alert = "⚠️ Compressor strain detected"
-                elif item["Device"] == "Refrigerator" and random.random() > 0.9: alert = "❄️ Door likely left open"
-
+                status_color = "#00FF7F" if item["Status"] == "ON" else "#888"
+                status_html = f'<span style="color:{status_color}; font-weight:bold;">{item["Status"]}</span>'
                 with st.container():
-                    c1, c2, c3 = st.columns([2, 1, 2])
-                    c1.markdown(f"**{item['Device']}**")
-                    c2.markdown(f":{color}[{item['Status']}]")
-                    c3.markdown(f"**{item['Power (kW)']} kW**")
-                    if alert: st.error(alert)
-                    st.progress(int(item["Usage %"]) if item["Usage %"] < 100 else 100)
+                    col_a, col_b, col_c = st.columns([3, 2, 2])
+                    col_a.markdown(f"**{item['Device']}**")
+                    col_b.markdown(status_html, unsafe_allow_html=True)
+                    col_c.markdown(f"{item['Power']:.2f} kW")
                     st.divider()
 
-# --- PAGE 3: COMMUNITY RANK (Restored Leaderboard + Chart) ---
+# --- PAGE 4: COMMUNITY RANK ---
 elif selected == "Community Rank":
-    st.title("🏆 Community Energy Benchmarking")
-    st.markdown("Compare your efficiency with similar households anonymously.")
+    st.title("🏆 WattQ Leaderboard")
+    st.markdown("Compare efficiency with your neighborhood.")
     
-    # 1. GENERATE LOCAL DATA (Safe Mode)
     neighbors = []
     for i in range(1, 8):
-        n_load = round(random.uniform(0.5, 4.0), 2)
-        score = int((10 - n_load) * 100)
-        neighbors.append({
-            "id": f"Neighbor #{random.randint(1000, 9999)}",
-            "usage_kw": n_load,
-            "score": score,
-            "is_user": False,
-            "rank": 0
-        })
+        load = round(random.uniform(0.5, 4.0), 2)
+        score = int((10 - load) * 100)
+        neighbors.append({"id": f"Neighbor #{random.randint(100,999)}", "load": load, "score": score, "is_user": False})
     
-    # Get user load safely
     try:
-        live = requests.get(f"{API_URL}/api/live", timeout=0.5).json()
-        user_load = live['total_load_kw']
-    except:
-        user_load = 1.2
-        
-    neighbors.append({
-        "id": "YOU (My Home)",
-        "usage_kw": user_load,
-        "score": int((10 - user_load) * 100),
-        "is_user": True,
-        "rank": 0
-    })
+        user_load = requests.get(f"{API_URL}/api/live", timeout=1).json()['total_load_kw']
+    except: user_load = 1.5
     
-    # Sort
-    neighbors.sort(key=lambda x: x['usage_kw'])
-    for idx, item in enumerate(neighbors):
-        item['rank'] = idx + 1
-        
-    df_comm = pd.DataFrame(neighbors)
-    user_entry = next((item for item in neighbors if item["is_user"]), None)
+    neighbors.append({"id": "YOU (WattQ Home)", "load": user_load, "score": int((10-user_load)*100), "is_user": True})
+    neighbors.sort(key=lambda x: x['load'])
     
-    # 2. TOP METRICS
-    st.info(f"🔒 Privacy Note: All neighbor identities are anonymized. You are viewing 'Live' comparisons.")
-    c1, c2 = st.columns(2)
-    with c1:
-        st.metric("Your Community Rank", f"#{user_entry['rank']}", delta="Top 20%" if user_entry['rank'] <=3 else "- Needs Improvement")
-    with c2:
-        st.metric("Your Green Score", f"{user_entry['score']} pts", "High Efficiency" if user_entry['score'] > 800 else "Average")
-
-    # 3. LEADERBOARD TABLE (RESTORED)
-    st.subheader("🏅 Top Energy Savers (Live Leaderboard)")
+    for idx, n in enumerate(neighbors): n['rank'] = idx + 1
     
-    def highlight_user(row):
-        return ['background-color: #2E8B57; color: white' if row['Household ID'] == "YOU (My Home)" else '' for _ in row]
-
-    display_df = df_comm[['rank', 'id', 'usage_kw', 'score']].copy()
-    display_df.columns = ["Rank", "Household ID", "Current Usage (kW)", "Green Score"]
+    df = pd.DataFrame(neighbors)
     
-    st.dataframe(
-        display_df.style.apply(highlight_user, axis=1),
-        use_container_width=True,
-        hide_index=True
-    )
-
-    # 4. CHART
-    st.subheader("📊 You vs The Neighborhood")
-    colors = ['#00FF7F' if x == "YOU (My Home)" else '#555555' for x in df_comm['id']]
+    user_row = df[df['is_user'] == True]
+    if not user_row.empty:
+        user_rank = user_row.iloc[0]['rank']
+        user_score = user_row.iloc[0]['score']
+        m1, m2 = st.columns(2)
+        m1.metric("Your Rank", f"#{user_rank}")
+        m2.metric("Eco Score", f"{user_score} pts")
     
-    fig = px.bar(
-        df_comm, 
-        x='id', 
-        y='usage_kw', 
-        title="Real-Time Load Comparison",
-        labels={'usage_kw': 'Power Usage (kW)', 'id': 'Household'},
-        text_auto=True
-    )
+    st.subheader("Top Savers")
+    display_df = df[['rank', 'id', 'load', 'score']].copy()
+    display_df.columns = ["Rank", "Household", "Avg Load (kW)", "Score"]
+    
+    def highlight_row(row):
+        return ['background-color: #006633' if "YOU" in row['Household'] else '' for _ in row]
+    
+    st.dataframe(display_df.style.apply(highlight_row, axis=1), use_container_width=True, hide_index=True)
+    
+    colors = ['#00FF7F' if x['is_user'] else '#444' for x in neighbors]
+    fig = px.bar(df, x='id', y='load', title="Comparison (Lower is Better)")
     fig.update_traces(marker_color=colors)
     fig.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="white")
     st.plotly_chart(fig, use_container_width=True)
 
-# --- PAGE 4: AI FORECAST (Real Weather Version) ---
+# --- PAGE 5: FORECAST ---
 elif selected == "AI Forecast":
-    st.title("📈 Smart Consumption Forecasting")
-    st.markdown("Predicts energy usage based on **Real-Time Weather**.")
+    st.title("📈 FutureCast")
+    st.markdown("Predictive insights based on **Hyper-local Weather**.")
     
-    col_input, col_status = st.columns([1, 2])
-    with col_input:
-        city = st.text_input("📍 Your Location", value="Hubballi")
+    city = st.text_input("📍 Location", value="Hubballi")
     
     try:
         res = requests.get(f"{API_URL}/api/forecast?city={city}").json()
         df = pd.DataFrame(res)
         
         avg_temp = df['temp_c'].mean()
-        total_pred = df['predicted_kwh'].sum()
+        total_units = df['predicted_kwh'].sum()
+        est_cost = total_units * 10
         
-        with col_status:
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Avg Temp (5 Days)", f"{avg_temp:.1f}°C")
-            m2.metric("Predicted Usage", f"{total_pred:.1f} kWh")
-            m3.metric("Cost Est.", f"${total_pred * 0.12:.2f}")
-            
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Avg Temp", f"{avg_temp:.1f}°C")
+        c2.metric("Pred. Units", f"{total_units:.1f} kWh")
+        c3.metric("Est. Bill (5 Days)", f"₹{est_cost:.0f}")
+        
         st.divider()
-        st.subheader(f"Weather vs Energy Trend for {city}")
         
         fig = go.Figure()
-        fig.add_trace(go.Bar(x=df['date'], y=df['predicted_kwh'], name="Predicted Energy (kWh)", marker_color='#00FF7F'))
-        fig.add_trace(go.Scatter(x=df['date'], y=df['temp_c'], name="Temperature (°C)", yaxis="y2", line=dict(color='#FF5733', width=3)))
+        fig.add_trace(go.Bar(x=df['date'], y=df['predicted_kwh'], name="Units (kWh)", marker_color='#00C3FF'))
+        fig.add_trace(go.Scatter(x=df['date'], y=df['temp_c'], name="Temp (°C)", yaxis="y2", line=dict(color='#FFD700', width=3)))
         
         fig.update_layout(
-            yaxis=dict(title="Energy (kWh)"),
+            yaxis=dict(title="Units (kWh)"),
             yaxis2=dict(title="Temp (°C)", overlaying="y", side="right"),
             plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="white",
             legend=dict(orientation="h", y=1.1)
         )
         st.plotly_chart(fig, use_container_width=True)
         
-        if avg_temp > 28: st.warning("🔥 High Temperatures predicted! AC usage will likely increase your bill by ~15%.")
-        elif avg_temp < 18: st.info("❄️ Cold weather ahead. Heating load detected.")
-        else: st.success("✅ Moderate weather. Optimal energy efficiency expected.")
-            
-    except Exception as e:
-        st.error(f"Could not fetch weather data. Check API Key or City Name. Error: {e}")
+    except:
+        st.error("Weather Service Unreachable.")
 
-# --- PAGE 5: VOICE ASSISTANT (Restored Full Version) ---
+# --- PAGE 6: VOICE ASSISTANT ---
 elif selected == "Voice Assist":
-    st.title("🎙️ Gemini Eco-Assistant")
-    st.markdown("### Interactive Energy Advisor")
+    st.title("🎙️ WattQ Voice")
+    st.markdown("Ask: *'How much is my bill in Rupees?'*")
     
-    col1, col2 = st.columns([1, 2])
-    
-    with col1:
-        st.image("https://cdn-icons-png.flaticon.com/512/3747/3747161.png", width=150)
-        st.info("💡 Tip: Click the mic, allow permission, and ask: *'How much did I spend today?'*")
+    c1, c2 = st.columns([1, 2])
+    with c1:
+        st.image("https://cdn-icons-png.flaticon.com/512/3747/3747161.png", width=120)
         
-        st.write("### 🗣️ Speak Now:")
-        audio_data = mic_recorder(
-            start_prompt="🔴 Start Recording",
-            stop_prompt="⏹️ Stop Recording",
-            just_once=True,
-            use_container_width=True,
-            format="wav",
-            key="recorder"
+        # --- FIXED: Added format="wav" to ensure compatibility ---
+        audio = mic_recorder(
+            start_prompt="🔴 Tap to Speak",
+            stop_prompt="⏹️ Stop",
+            key="recorder",
+            format="wav",  # <--- CRITICAL FIX
+            use_container_width=True
         )
         
-        if audio_data:
-            st.success("✅ Audio Captured! Processing...")
-            audio_bytes = audio_data['bytes']
+        if audio:
+            st.info("Processing audio...")
             r = sr.Recognizer()
             try:
-                with sr.AudioFile(io.BytesIO(audio_bytes)) as source:
+                # Convert bytes to audio source
+                audio_data = sr.AudioFile(io.BytesIO(audio['bytes']))
+                with audio_data as source:
+                    r.adjust_for_ambient_noise(source) # Remove background noise
                     audio_content = r.record(source)
-                    user_text = r.recognize_google(audio_content)
                 
-                st.session_state.last_voice_query = user_text
+                # Transcribe
+                text = r.recognize_google(audio_content)
+                st.session_state.last_q = text
                 
-                # SEND TO BACKEND
-                payload = {"text": user_text}
-                try:
-                    res = requests.post(f"{API_URL}/api/voice_assistant", json=payload)
-                    bot_reply = res.json()['response']
-                    st.session_state.last_voice_reply = bot_reply
-                    speak_text(bot_reply)
-                except Exception as e:
-                    st.error(f"Backend Error: {e}")
+                # Send to Backend
+                res = requests.post(f"{API_URL}/api/voice_assistant", json={"text": text}).json()
+                st.session_state.last_a = res['response']
+                speak_text(res['response'])
+                
             except sr.UnknownValueError:
-                st.warning("Could not understand audio.")
-            except sr.RequestError:
-                st.error("Speech Recognition Service down.")
+                st.error("Could not understand audio. Please speak clearly.")
+            except sr.RequestError as e:
+                st.error(f"Connection Error: {e}")
+            except Exception as e:
+                st.error(f"System Error: {e}")
 
-    with col2:
+    with c2:
         st.subheader("Conversation Log")
         chat_container = st.container(border=True)
         with chat_container:
-            if "last_voice_query" in st.session_state:
+            if "last_q" in st.session_state:
                 with st.chat_message("user"):
-                    st.write(st.session_state.last_voice_query)
-            if "last_voice_reply" in st.session_state:
+                    st.write(st.session_state.last_q)
+            
+            if "last_a" in st.session_state:
                 with st.chat_message("assistant"):
-                    st.markdown(f"**Gemini:** {st.session_state.last_voice_reply}")
-            if "last_voice_query" not in st.session_state:
+                    st.markdown(f"**WattQ:** {st.session_state.last_a}")
+            
+            if "last_q" not in st.session_state:
                 st.caption("Waiting for voice input...")
-
-# --- PAGE 6: ADMIN CONTROL ---
+# --- PAGE 7: ADMIN ---
 elif selected == "Admin Control":
-    st.title("⚙️ Demo Controls")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("🔥 Trigger Emergency")
-        if st.button("Simulate Overload (Fire Hazard)"):
-            requests.post(f"{API_URL}/api/simulate_danger?enable=true")
-            st.toast("Emergency Mode ACTIVATED!", icon="🚨")
-    with col2:
-        st.subheader("✅ Reset System")
-        if st.button("Restore Normal Operation"):
-            requests.post(f"{API_URL}/api/simulate_danger?enable=false")
-            st.toast("System Normalized", icon="✅")
+    st.title("⚙️ System Override")
+    c1, c2 = st.columns(2)
+    if c1.button("🔥 Simulate Surge"): requests.post(f"{API_URL}/api/simulate_danger?enable=true"); st.toast("Surge Active!")
+    if c2.button("✅ Normalize Grid"): requests.post(f"{API_URL}/api/simulate_danger?enable=false"); st.toast("Grid Stable")
