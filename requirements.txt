@@ -1,0 +1,16 @@
+streamlit
+fastapi
+uvicorn
+pandas
+numpy
+plotly
+requests
+streamlit-option-menu
+streamlit-extras
+pydantic
+scikit-learn
+google-generativeai
+SpeechRecognition
+pyttsx3
+pyaudio
+streamlit-mic-recorder
